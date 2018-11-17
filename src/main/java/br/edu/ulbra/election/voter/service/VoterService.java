@@ -19,113 +19,108 @@ import java.util.List;
 @Service
 public class VoterService {
 
-	private final VoterRepository voterRepository;
+    private final VoterRepository voterRepository;
 
-	private final ModelMapper modelMapper;
+    private final ModelMapper modelMapper;
 
-	private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-	private static final String MESSAGE_INVALID_ID = "Invalid id";
-	private static final String MESSAGE_VOTER_NOT_FOUND = "Voter not found";
-	private static final String MESSAGE_EMAIL_FOUND = "This email already exists";
-	private static final String MESSAGE_VOTER_PASSWORD_NOT_MATCH = "Password doesn't match";
+    private static final String MESSAGE_INVALID_ID = "Invalid id";
+    private static final String MESSAGE_VOTER_NOT_FOUND = "Voter not found";
 
-	@Autowired
-	public VoterService(VoterRepository voterRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder) {
-		this.voterRepository = voterRepository;
-		this.modelMapper = modelMapper;
-		this.passwordEncoder = passwordEncoder;
-	}
+    @Autowired
+    public VoterService(VoterRepository voterRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder){
+        this.voterRepository = voterRepository;
+        this.modelMapper = modelMapper;
+        this.passwordEncoder = passwordEncoder;
+    }
 
-	public List<VoterOutput> getAll() {
-		Type voterOutputListType = new TypeToken<List<VoterOutput>>() {
-		}.getType();
-		return modelMapper.map(voterRepository.findAll(), voterOutputListType);
-	}
+    public List<VoterOutput> getAll(){
+        Type voterOutputListType = new TypeToken<List<VoterOutput>>(){}.getType();
+        return modelMapper.map(voterRepository.findAll(), voterOutputListType);
+    }
 
-	public VoterOutput create(VoterInput voterInput) {
-		validateInput(voterInput, false);
-		Voter voter = modelMapper.map(voterInput, Voter.class);
-		voter.setPassword(passwordEncoder.encode(voter.getPassword()));
-		voter = voterRepository.save(voter);
-		return modelMapper.map(voter, VoterOutput.class);
-	}
+    public VoterOutput create(VoterInput voterInput) {
+        validateInput(voterInput, false);
+        checkEmailDuplicate(voterInput.getEmail(), null);
+        Voter voter = modelMapper.map(voterInput, Voter.class);
+        voter.setPassword(passwordEncoder.encode(voter.getPassword()));
+        voter = voterRepository.save(voter);
+        return modelMapper.map(voter, VoterOutput.class);
+    }
 
-	public VoterOutput getById(Long voterId) {
-		if (voterId == null) {
-			throw new GenericOutputException(MESSAGE_INVALID_ID);
-		}
+    public VoterOutput getById(Long voterId){
+        if (voterId == null){
+            throw new GenericOutputException(MESSAGE_INVALID_ID);
+        }
 
-		Voter voter = voterRepository.findById(voterId).orElse(null);
-		if (voter == null) {
-			throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
-		}
+        Voter voter = voterRepository.findById(voterId).orElse(null);
+        if (voter == null){
+            throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
+        }
 
-		return modelMapper.map(voter, VoterOutput.class);
-	}
+        return modelMapper.map(voter, VoterOutput.class);
+    }
 
-	public VoterOutput update(Long voterId, VoterInput voterInput) {
-		if (voterId == null) {
-			throw new GenericOutputException(MESSAGE_INVALID_ID);
-		}
-		validateInput(voterInput, true);
+    public VoterOutput update(Long voterId, VoterInput voterInput) {
+        if (voterId == null){
+            throw new GenericOutputException(MESSAGE_INVALID_ID);
+        }
+        validateInput(voterInput, true);
+        checkEmailDuplicate(voterInput.getEmail(), voterId);
 
-		Voter voter = voterRepository.findById(voterId).orElse(null);
-		if (voter == null) {
-			throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
-		}
+        Voter voter = voterRepository.findById(voterId).orElse(null);
+        if (voter == null){
+            throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
+        }
 
-		voter.setEmail(voterInput.getEmail());
-		voter.setName(voterInput.getName());
-		if (!StringUtils.isBlank(voterInput.getPassword())) {
-			voter.setPassword(passwordEncoder.encode(voterInput.getPassword()));
-		}
-		voter = voterRepository.save(voter);
-		return modelMapper.map(voter, VoterOutput.class);
-	}
+        voter.setEmail(voterInput.getEmail());
+        voter.setName(voterInput.getName());
+        if (!StringUtils.isBlank(voterInput.getPassword())) {
+            voter.setPassword(passwordEncoder.encode(voterInput.getPassword()));
+        }
+        voter = voterRepository.save(voter);
+        return modelMapper.map(voter, VoterOutput.class);
+    }
 
-	public GenericOutput delete(Long voterId) {
-		if (voterId == null) {
-			throw new GenericOutputException(MESSAGE_INVALID_ID);
-		}
+    public GenericOutput delete(Long voterId) {
+        if (voterId == null){
+            throw new GenericOutputException(MESSAGE_INVALID_ID);
+        }
 
-		Voter voter = voterRepository.findById(voterId).orElse(null);
-		if (voter == null) {
-			throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
-		}
+        Voter voter = voterRepository.findById(voterId).orElse(null);
+        if (voter == null){
+            throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
+        }
 
-		voterRepository.delete(voter);
+        voterRepository.delete(voter);
 
-		return new GenericOutput("Voter deleted");
-	}
+        return new GenericOutput("Voter deleted");
+    }
 
-	private void validateInput(VoterInput voterInput, boolean isUpdate) {
-		if (StringUtils.isBlank(voterInput.getEmail())) {
-			throw new GenericOutputException("Invalid email");
-		}
-		String[] names = voterInput.getName().split(" ");
-		if (StringUtils.isBlank(voterInput.getName()) ||
-				voterInput.getName().length() < 3 ||
-				names.length > 1
-				) {
-			throw new GenericOutputException("Invalid name");
-		}
-		if (!StringUtils.isBlank(voterInput.getPassword())) {
-			if (!voterInput.getPassword().equals(voterInput.getPasswordConfirm())) {
-				throw new GenericOutputException(MESSAGE_VOTER_PASSWORD_NOT_MATCH);
-			}
-		} else {
-			if (!isUpdate) {
-				throw new GenericOutputException(MESSAGE_VOTER_PASSWORD_NOT_MATCH);
-			}
-		}
+    private void checkEmailDuplicate(String email, Long currentVoter){
+        Voter voter = voterRepository.findFirstByEmail(email);
+        if (voter != null && !voter.getId().equals(currentVoter)){
+            throw new GenericOutputException("Duplicate email");
+        }
+    }
 
-		if (!isUpdate) {
-			List<Voter> voterVali = voterRepository.findByEmail(voterInput.getEmail());
-			if (voterVali.size() > 0) {
-				throw new GenericOutputException(MESSAGE_EMAIL_FOUND);
-			}
-		}
-	}
+    private void validateInput(VoterInput voterInput, boolean isUpdate){
+        if (StringUtils.isBlank(voterInput.getEmail())){
+            throw new GenericOutputException("Invalid email");
+        }
+        if (StringUtils.isBlank(voterInput.getName()) || voterInput.getName().trim().length() < 5 || !voterInput.getName().trim().contains(" ")) {
+            throw new GenericOutputException("Invalid name");
+        }
+        if (!StringUtils.isBlank(voterInput.getPassword())){
+            if (!voterInput.getPassword().equals(voterInput.getPasswordConfirm())){
+                throw new GenericOutputException("Passwords doesn't match");
+            }
+        } else {
+            if (!isUpdate) {
+                throw new GenericOutputException("Password doesn't match");
+            }
+        }
+    }
 
 }
