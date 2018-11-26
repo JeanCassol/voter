@@ -1,11 +1,8 @@
 package br.edu.ulbra.election.voter.service;
 
-import br.edu.ulbra.election.voter.exception.GenericOutputException;
-import br.edu.ulbra.election.voter.input.v1.VoterInput;
-import br.edu.ulbra.election.voter.model.Voter;
-import br.edu.ulbra.election.voter.output.v1.GenericOutput;
-import br.edu.ulbra.election.voter.output.v1.VoterOutput;
-import br.edu.ulbra.election.voter.repository.VoterRepository;
+import java.lang.reflect.Type;
+import java.util.List;
+
 import org.apache.commons.lang.StringUtils;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
@@ -13,26 +10,37 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.lang.reflect.Type;
-import java.util.List;
+import br.edu.ulbra.election.voter.client.VoteClientService;
+import br.edu.ulbra.election.voter.exception.GenericOutputException;
+import br.edu.ulbra.election.voter.input.v1.VoterInput;
+import br.edu.ulbra.election.voter.model.Voter;
+import br.edu.ulbra.election.voter.output.v1.GenericOutput;
+import br.edu.ulbra.election.voter.output.v1.VoteOutput;
+import br.edu.ulbra.election.voter.output.v1.VoterOutput;
+import br.edu.ulbra.election.voter.repository.VoterRepository;
+import feign.FeignException;
 
 @Service
 public class VoterService {
 
     private final VoterRepository voterRepository;
-
     private final ModelMapper modelMapper;
-
     private final PasswordEncoder passwordEncoder;
-
+    private final VoteClientService voteClientService;
+    
     private static final String MESSAGE_INVALID_ID = "Invalid id";
     private static final String MESSAGE_VOTER_NOT_FOUND = "Voter not found";
-
+    private static final String MESSAGE_PASSWORDS_NOT_MATCH = "Password doesn't match";
+    private static final String MESSAGE_DUPLICATE_EMAIL = "Duplicate email";
+    private static final String MESSAGE_INVALID_NAME = "Invalid name";
+    private static final String MESSAGE_INVALID_EMAIL = "Invalid email";
+    private static final String MESSAGE_VOTER_DELETED = "Voter deleted";
     @Autowired
-    public VoterService(VoterRepository voterRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder){
+    public VoterService(VoterRepository voterRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder, VoteClientService voteClientService){
         this.voterRepository = voterRepository;
         this.modelMapper = modelMapper;
         this.passwordEncoder = passwordEncoder;
+        this.voteClientService = voteClientService;
     }
 
     public List<VoterOutput> getAll(){
@@ -68,7 +76,7 @@ public class VoterService {
         }
         validateInput(voterInput, true);
         checkEmailDuplicate(voterInput.getEmail(), voterId);
-
+        validateReference(voterId, false);
         Voter voter = voterRepository.findById(voterId).orElse(null);
         if (voter == null){
             throw new GenericOutputException(MESSAGE_VOTER_NOT_FOUND);
@@ -95,30 +103,43 @@ public class VoterService {
 
         voterRepository.delete(voter);
 
-        return new GenericOutput("Voter deleted");
+        return new GenericOutput(MESSAGE_VOTER_DELETED);
     }
 
     private void checkEmailDuplicate(String email, Long currentVoter){
         Voter voter = voterRepository.findFirstByEmail(email);
         if (voter != null && !voter.getId().equals(currentVoter)){
-            throw new GenericOutputException("Duplicate email");
+            throw new GenericOutputException(MESSAGE_DUPLICATE_EMAIL);
         }
     }
 
+    private void validateReference(Long voterId, boolean isUpdate) {
+    	try {
+    	if(!isUpdate) {
+			VoteOutput voteOutput = voteClientService.getByVoterId(voterId);
+			if (voteOutput != null && voteOutput.getVoterId() != 0) {
+				throw new GenericOutputException("Voter with Vote");
+			}
+    	}
+    	}catch (FeignException e) {
+			e.printStackTrace();
+		}
+	}
+    
     private void validateInput(VoterInput voterInput, boolean isUpdate){
         if (StringUtils.isBlank(voterInput.getEmail())){
-            throw new GenericOutputException("Invalid email");
+            throw new GenericOutputException(MESSAGE_INVALID_EMAIL);
         }
         if (StringUtils.isBlank(voterInput.getName()) || voterInput.getName().trim().length() < 5 || !voterInput.getName().trim().contains(" ")) {
-            throw new GenericOutputException("Invalid name");
+            throw new GenericOutputException(MESSAGE_INVALID_NAME);
         }
         if (!StringUtils.isBlank(voterInput.getPassword())){
             if (!voterInput.getPassword().equals(voterInput.getPasswordConfirm())){
-                throw new GenericOutputException("Passwords doesn't match");
+                throw new GenericOutputException(MESSAGE_PASSWORDS_NOT_MATCH);
             }
         } else {
             if (!isUpdate) {
-                throw new GenericOutputException("Password doesn't match");
+                throw new GenericOutputException(MESSAGE_PASSWORDS_NOT_MATCH);
             }
         }
     }

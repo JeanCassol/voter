@@ -68,7 +68,7 @@ public class VoterApiTest {
         given(voterService.create(any()))
                 .willReturn(VoterBuilder.getVoterOutput());
 
-        mockMvc.perform(put(URL_BASE)
+        mockMvc.perform(post(URL_BASE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(gson.toJson(VoterBuilder.getVoterInput()))
         )
@@ -83,7 +83,7 @@ public class VoterApiTest {
         given(voterService.update(anyLong(), any()))
                 .willReturn(VoterBuilder.getVoterOutput());
 
-        mockMvc.perform(post(URL_BASE + "1")
+        mockMvc.perform(put(URL_BASE + "1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(gson.toJson(VoterBuilder.getVoterInput()))
         )
