@@ -4,6 +4,7 @@ import br.edu.ulbra.election.voter.model.Token;
 import br.edu.ulbra.election.voter.model.Voter;
 import org.springframework.data.repository.CrudRepository;
 
+@org.springframework.stereotype.Repository
 public interface TokenRepository extends CrudRepository<Token, Long> {
     Token findFirstByVoter(Voter voter);
     Token findFirstByToken(String token);

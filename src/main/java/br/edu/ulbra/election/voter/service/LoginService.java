@@ -67,7 +67,7 @@ public class LoginService {
         Date expireDate = new Date(timeStamp + EXPIRE_TIME_IN_MILLIS);
 
         String tokenString = generateToken(voter, expireDate);
-        token.setToken(tokenString);
+        token.setToken(tokenString.replaceAll("/", ""));
         token.setExpireDate(expireDate);
         tokenRepository.save(token);
 
@@ -81,6 +81,7 @@ public class LoginService {
             throw new GenericOutputException(INVALID_TOKEN);
         }
 
+        
         Token token = tokenRepository.findFirstByToken(tokenInput);
         if (token == null){
             throw new GenericOutputException(INVALID_TOKEN);
